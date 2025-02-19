@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeatherSphere - Real-Time Weather Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+
+        #searchInput {
+            padding: 0.8rem;
+            border: none;
+            border-radius: 25px;
+            width: 300px;
+            font-size: 1rem;
+        }
+
+        #searchButton {
+            padding: 0.8rem 2rem;
+            border: none;
+            border-radius: 25px;
+            background: #00b4d8;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #searchButton:hover {
+            background: #0096c7;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        #map {
+            height: 600px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .weather-cards {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .weather-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .error {
+            color: #ff6b6b;
+            text-align: center;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WeatherSphere 🌍</h1>
+            <p>Real-Time Weather Dashboard with Map Integration</p>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Enter city name...">
+            <button id="searchButton">Search</button>
+        </div>
+
+        <div class="dashboard">
+            <div id="map"></div>
+            <div class="weather-cards" id="weatherCards"></div>
+        </div>
+        <div id="errorMessage" class="error"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Initialize Map
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // API Configuration
+        const API_KEY = '665992eb3e130d58370b20a2b03d4e9f'; // Get from openweathermap.org
+        const BASE_URL = 'https://api.openweathermap.org/data/2.5/weather';
+
+        // DOM Elements
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const weatherCards = document.getElementById('weatherCards');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Get user's current location
+        navigator.geolocation.getCurrentPosition((position) => {
+            const { latitude, longitude } = position.coords;
+            map.setView([latitude, longitude], 10);
+            getWeatherDataByCoords(latitude, longitude);
+        });
+
+        // Event Listeners
+        searchButton.addEventListener('click', searchWeather);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchWeather();
+        });
+
+        async function searchWeather() {
+            const city = searchInput.value.trim();
+            if (!city) return;
+
+            try {
+                const response = await fetch(`${BASE_URL}?q=${city}&appid=${API_KEY}&units=metric`);
+                const data = await response.json();
+                
+                if (data.cod === 200) {
+                    errorMessage.textContent = '';
+                    updateUI(data);
+                    updateMap(data.coord.lat, data.coord.lon);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                errorMessage.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function updateUI(data) {
+            const card = document.createElement('div');
+            card.className = 'weather-card';
+            card.innerHTML = `
+                <h2>${data.name}, ${data.sys.country}</h2>
+                <p>Temperature: ${Math.round(data.main.temp)}°C</p>
+                <p>Weather: ${data.weather[0].main}</p>
+                <p>Humidity: ${data.main.humidity}%</p>
+                <p>Wind Speed: ${data.wind.speed} m/s</p>
+            `;
+            weatherCards.prepend(card);
+        }
+
+        function updateMap(lat, lon) {
+            map.setView([lat, lon], 10);
+            L.marker([lat, lon]).addTo(map)
+                .bindPopup(`Lat: ${lat}<br>Lon: ${lon}`)
+                .openPopup();
+        }
+
+        async function getWeatherDataByCoords(lat, lon) {
+            try {
+                const response = await fetch(`${BASE_URL}?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`);
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                errorMessage.textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
